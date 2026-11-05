@@ -32,9 +32,7 @@ class LobbyPreviewApp extends StatelessWidget {
       title: 'Ludo Rush — Lobby',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
-      home: LobbyScreen(
-        onStartMatch: (_) {},
-      ),
+      home: const LobbyScreen(),
     );
   }
 }
