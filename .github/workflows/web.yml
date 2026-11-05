@@ -1,0 +1,86 @@
+name: Lobby Web Preview
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.5"
+          channel: stable
+          cache: true
+
+      - name: Enable web
+        run: flutter config --enable-web
+
+      - name: Pub get
+        run: |
+          if [ -f pubspec.yaml ]; then
+            flutter pub get
+          else
+            echo "No Flutter project yet — upload source first"
+            mkdir -p build/web
+            echo '<!DOCTYPE html><html><body style="background:#111;color:#ffc93c;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><h1>Upload Ludo source to this repo, then re-run workflow</h1></body></html>' > build/web/index.html
+            exit 0
+          fi
+
+      - name: Ensure web folder
+        run: |
+          mkdir -p web
+          if [ ! -f web/index.html ]; then
+            cat > web/index.html << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ludo Rush Lobby</title>
+</head>
+<body>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
+EOF
+          fi
+
+      - name: Build web (lobby-only entry if present)
+        run: |
+          if [ ! -f pubspec.yaml ]; then exit 0; fi
+          # Prefer lobby-only main if provided
+          if [ -f lib/main_lobby.dart ]; then
+            flutter build web --release -t lib/main_lobby.dart --base-href "/ludo-lobby-preview/"
+          else
+            flutter build web --release --base-href "/ludo-lobby-preview/"
+          fi
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
